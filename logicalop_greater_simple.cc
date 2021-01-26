@@ -1,17 +1,26 @@
-/* Copyright 2018 The TensorFlow Authors. All Rights Reserved.
+/* error message
+W0125 16:33:44.650311 1361235 logicalop_greater_simple.cc:100] TensorRT version 7.1.3
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+I0125 16:33:45.908890 1361235 logicalop_greater_simple.cc:73] start layer
 
-    http://www.apache.org/licenses/LICENSE-2.0
+I0125 16:33:45.908952 1361235 logicalop_greater_simple.cc:78] finish layer
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-==============================================================================*/
+I0125 16:33:45.908958 1361235 logicalop_greater_simple.cc:86] start engine
+
+E0125 16:33:45.908996 1361235 logicalop_greater_simple.cc:47] Output tensor output of type Float produced from output of incompatible type Bool
+
+E0125 16:33:45.909008 1361235 logicalop_greater_simple.cc:47] Could not compute dimensions for output, because the network is not valid.
+
+E0125 16:33:45.909020 1361235 logicalop_greater_simple.cc:47] Network validation failed.
+
+I0125 16:33:45.909027 1361235 logicalop_greater_simple.cc:88] finish engine
+
+I0125 16:33:45.921908 1361235 addr2line_stacktrace.cc:329] RAW: Encountered ELF file without required debug sections
+
+experimental/users/bixia/trt_test/logicalop_greater_simple.cc:89: Failure
+
+Expected: (engine) != (nullptr), actual: NULL vs (nullptr)
+ */
 
 #include <cstddef>
 #include "third_party/tensorflow/core/common_runtime/gpu/gpu_init.h"
