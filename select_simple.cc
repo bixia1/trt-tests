@@ -1,33 +1,18 @@
-/* reproducer to show a problem in creating a network that use the
- * logicalGreater output as network output.
+/* reproducer to show a problem in creating a select layer using the result of a
+ * logical greater layer as a condition.
  * NOTE: you probably need to adjust the include path, and put this file in
  * github tensorflow/compiler/tf2tensorrt/ test env to compile and run it.
  * But you can also just take the "core" of this code and put it on your test
  * env to compile and run.
-
-error message
-W0125 16:33:44.650311 1361235 logicalop_greater_simple.cc:100] TensorRT version 7.1.3
-
-I0125 16:33:45.908890 1361235 logicalop_greater_simple.cc:73] start layer
-
-I0125 16:33:45.908952 1361235 logicalop_greater_simple.cc:78] finish layer
-
-I0125 16:33:45.908958 1361235 logicalop_greater_simple.cc:86] start engine
-
-E0125 16:33:45.908996 1361235 logicalop_greater_simple.cc:47] Output tensor output of type Float produced from output of incompatible type Bool
-
-E0125 16:33:45.909008 1361235 logicalop_greater_simple.cc:47] Could not compute dimensions for output, because the network is not valid.
-
-E0125 16:33:45.909020 1361235 logicalop_greater_simple.cc:47] Network validation failed.
-
-I0125 16:33:45.909027 1361235 logicalop_greater_simple.cc:88] finish engine
-
-I0125 16:33:45.921908 1361235 addr2line_stacktrace.cc:329] RAW: Encountered ELF file without required debug sections
-
-experimental/users/bixia/trt_test/logicalop_greater_simple.cc:89: Failure
-
-Expected: (engine) != (nullptr), actual: NULL vs (nullptr)
- */
+ *
+ error message:
+W0126 11:24:22.208405    7293 select_simple.cc:109] TensorRT version 7.1.3
+I0126 11:24:23.136196    7293 select_simple.cc:77] start comp
+I0126 11:24:23.136241    7293 select_simple.cc:82] finish comp
+I0126 11:24:23.136244    7293 select_simple.cc:85] start select
+E0126 11:24:23.136254    7293 select_simple.cc:45] Parameter check failed at: ../builder/Network.cpp::addSelect::952, condition: !hasImplicitBatchDimension()
+I0126 11:24:23.136279    7293 select_simple.cc:87] end select
+*/
 
 #include <cstddef>
 #include "third_party/tensorflow/core/common_runtime/gpu/gpu_init.h"
@@ -45,8 +30,6 @@ using namespace nvinfer1;
 
 namespace tensorflow {
 namespace {
-
-//#define RESULT_FLOAT
 
 class Logger : public nvinfer1::ILogger {
  public:
@@ -70,6 +53,8 @@ class Logger : public nvinfer1::ILogger {
 
 const char* kInput1Tensor = "input1";
 const char* kInput2Tensor = "input2";
+const char* kInput3Tensor = "input3";
+const char* kInput4Tensor = "input4";
 const char* kOutputTensor = "output";
 
 // Creates a network to compute y=x>x.
@@ -78,24 +63,34 @@ nvinfer1::IHostMemory* CreateNetwork() {
   nvinfer1::IBuilder* builder = nvinfer1::createInferBuilder(logger);
 
   nvinfer1::INetworkDefinition* network = builder->createNetwork();
-  // Add the input.
-  auto input1 = network->addInput(kInput1Tensor, nvinfer1::DataType::kFLOAT,
+  auto add_input = [&](const char* name) {
+    auto input = network->addInput(name, nvinfer1::DataType::kFLOAT,
                                  nvinfer1::DimsCHW{1, 1, 1});
-  EXPECT_NE(input1, nullptr);
-  auto input2 = network->addInput(kInput2Tensor, nvinfer1::DataType::kFLOAT,
-                                 nvinfer1::DimsCHW{1, 1, 1});
-  EXPECT_NE(input2, nullptr);
-  // Add the hidden layer.
-  LOG(INFO) << "start layer";
-  auto layer =
+    EXPECT_NE(input, nullptr);
+    return input;
+  };
+
+  auto input1 = add_input(kInput1Tensor);
+  auto input2 = add_input(kInput2Tensor);
+  auto input3 = add_input(kInput3Tensor);
+  auto input4 = add_input(kInput4Tensor);
+
+  LOG(INFO) << "start comp";
+  auto comp =
       network->addElementWise(*input1, *input2, ElementWiseOperation::kGREATER);
-  EXPECT_NE(layer, nullptr);
-  layer->setOutputType(0, nvinfer1::DataType::kBOOL); // This line doesn't seem to be useful
-  LOG(INFO) << "finish layer";
-  // Mark the output.
-  auto output = layer->getOutput(0);
+  EXPECT_NE(comp, nullptr);
+  comp->setOutputType(0, nvinfer1::DataType::kBOOL); // This line doesn't seem to be useful
+  LOG(INFO) << "finish comp";
+
+  auto cond = comp->getOutput(0);
+  LOG(INFO) << "start select";
+  auto select = network->addSelect(*cond, *input3, *input4);
+  LOG(INFO) << "end select";
+
+  auto output = select->getOutput(0);
   output->setName(kOutputTensor);
   network->markOutput(*output);
+
   // Build the engine
   builder->setMaxBatchSize(1);
   builder->setMaxWorkspaceSize(1 << 10);
@@ -111,8 +106,7 @@ nvinfer1::IHostMemory* CreateNetwork() {
   return model;
 }
 
-
-TEST(TensorrtTest, LogicalGreater) {
+TEST(TensorrtTest, SelectFP32) {
   LOG(WARNING) << "TensorRT version " << NV_TENSORRT_MAJOR << "."
                << NV_TENSORRT_MINOR << "." << NV_TENSORRT_PATCH;
 
