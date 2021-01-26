@@ -95,6 +95,7 @@ nvinfer1::IHostMemory* CreateNetwork() {
   // Mark the output.
   auto output = layer->getOutput(0);
   output->setName(kOutputTensor);
+  output->setType(nvinfer1::DataType::kBOOL);  // This line doesn't seem to be useful
   network->markOutput(*output);
   // Build the engine
   builder->setMaxBatchSize(1);
